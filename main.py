@@ -7,12 +7,14 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QAction
 
-from .tweaks.base import Tweak, Category, build_tab_widget
-from .tweaks import load_all_tweaks, group_by_category
-from .util.ps import checkpoint
+from tweaks.base import Tweak, Category, build_tab_widget
+from tweaks import load_all_tweaks, group_by_category
+from util.ps import checkpoint, restart_explorer
+from util.admin import ensure_admin, is_admin
 
 APP_ORG = "YourOrg"
 APP_NAME = "Windows 11 Tweaker (Modular)"
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -67,6 +69,21 @@ class MainWindow(QMainWindow):
 
         self.apply_styles()
 
+        # Secondary toolbar with extra actions
+        tb2 = QToolBar("Actions")
+        tb2.setIconSize(QSize(20, 20))
+        self.addToolBar(tb2)
+
+        actRevertAll = QAction("Revert All", self)
+        actRevertAll.setToolTip("Reload saved settings (discard unsaved changes)")
+        actRevertAll.triggered.connect(self.revert_all)
+        tb2.addAction(actRevertAll)
+
+        actRestartExplorer = QAction("Restart Explorer", self)
+        actRestartExplorer.setToolTip("Restart Windows Explorer to apply UI changes")
+        actRestartExplorer.triggered.connect(self.on_restart_explorer)
+        tb2.addAction(actRestartExplorer)
+
     def toast(self, msg: str):
         self.statusBar().showMessage(msg, 3000)
 
@@ -103,10 +120,20 @@ class MainWindow(QMainWindow):
         return actions
 
     def create_restore_point(self):
+        if not is_admin():
+            ok, msg = ensure_admin()
+            if not ok:
+                QMessageBox.information(self, "Elevation", msg)
+                return
         ok, out = checkpoint("Before Windows11Tweaker ApplyAll")
         QMessageBox.information(self, "Restore Point", out if ok else f"Failed: {out}")
 
     def apply_all(self):
+        if not is_admin():
+            ok, msg = ensure_admin()
+            if not ok:
+                QMessageBox.information(self, "Elevation", msg)
+                return
         try:
             _ = self.gather_all_actions()
         except ValueError as e:
@@ -115,6 +142,7 @@ class MainWindow(QMainWindow):
         for tab in self.tab_widgets.values():
             tab.apply()
         self.toast("All tabs applied")
+        self.ask_restart_explorer()
 
     def save_all(self):
         for tab in self.tab_widgets.values():
@@ -126,6 +154,37 @@ class MainWindow(QMainWindow):
             tab.load_defaults()
         self.toast("All tabs reset to defaults")
 
+    def revert_all(self):
+        for tab in self.tab_widgets.values():
+            tab.load_settings()
+        self.toast("All tabs reverted to saved settings")
+
+    def on_restart_explorer(self):
+        ok, out = restart_explorer()
+        QMessageBox.information(self, "Restart Explorer", out if ok else f"Failed: {out}")
+
+    def ask_restart_explorer(self):
+        # Honor persisted preference
+        ask = self.settings.value("General/AskRestartExplorer", True)
+        if not (ask is True or str(ask).lower() == "true"):
+            return
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setWindowTitle("Restart Explorer?")
+        box.setText("Some changes may require restarting Windows Explorer to take effect.")
+        box.setInformativeText("Restart Explorer now?")
+        yes = box.addButton("Yes", QMessageBox.ButtonRole.YesRole)
+        no = box.addButton("No", QMessageBox.ButtonRole.NoRole)
+        from PySide6.QtWidgets import QCheckBox
+        cb = QCheckBox("Don't ask again")
+        box.setCheckBox(cb)
+        box.exec()
+        if box.clickedButton() == yes:
+            self.on_restart_explorer()
+        if cb.isChecked():
+            self.settings.setValue("General/AskRestartExplorer", False)
+            self.settings.sync()
+
 
 def main():
     import sys
@@ -135,6 +194,7 @@ def main():
     w = MainWindow()
     w.show()
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()

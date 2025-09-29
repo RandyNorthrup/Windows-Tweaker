@@ -33,3 +33,4 @@ def ensure_admin(relaunch_args: str = "") -> Tuple[bool, str]:
 
 def run(cmd: list[str] | str, check: bool = False) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, text=True, shell=isinstance(cmd, str), check=check)
+

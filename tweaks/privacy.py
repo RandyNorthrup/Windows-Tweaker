@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import List, Tuple
 from .base import Tweak
-from ..util import registry as r
+from util import registry as r
 import winreg
 
 # ---- Privacy tweak implementations ----

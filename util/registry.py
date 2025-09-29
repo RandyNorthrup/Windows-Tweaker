@@ -69,3 +69,4 @@ def delete_reg_value(root, path: str, name: str) -> tuple[bool, str]:
         return True, f"not present {path}::{name}"
     except Exception as e:
         return False, f"reg delete failed {path}::{name}: {e}"
+

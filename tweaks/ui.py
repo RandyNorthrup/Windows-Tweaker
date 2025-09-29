@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import List, Tuple
 from .base import Tweak
-from ..util import registry as r
+from util import registry as r
 import winreg
 
 # ---- UI implementations ----
@@ -42,7 +42,46 @@ def apply_start_recommendations(hide: bool) -> tuple[bool, str]:
                            r"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer",
                            "HideRecommendedSection", 1 if hide else 0)
 
-# Transparency/corner radius are app-surface hints for this app; for system-level acrylic intensity there isn't a single stable knob.
+
+def apply_transparency_effects(enable: bool) -> tuple[bool, str]:
+    hkey = getattr(winreg, 'HKEY_CURRENT_USER', None)
+    if hkey is None:
+        return False, "Registry access not supported on this platform."
+    return r.set_reg_value(hkey,
+                           r"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                           "EnableTransparency", 1 if enable else 0)
+
+
+def apply_taskbar_size(size: str) -> tuple[bool, str]:
+    # 0=small, 1=medium (default), 2=large
+    mapv = {"Small": 0, "Medium": 1, "Large": 2}
+    val = mapv.get(size, 1)
+    hkey = getattr(winreg, 'HKEY_CURRENT_USER', None)
+    if hkey is None:
+        return False, "Registry access not supported on this platform."
+    return r.set_reg_value(hkey,
+                           r"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+                           "TaskbarSi", val)
+
+
+def apply_show_file_extensions(show: bool) -> tuple[bool, str]:
+    # HideFileExt: 0 = show, 1 = hide
+    hkey = getattr(winreg, 'HKEY_CURRENT_USER', None)
+    if hkey is None:
+        return False, "Registry access not supported on this platform."
+    return r.set_reg_value(hkey,
+                           r"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+                           "HideFileExt", 0 if show else 1)
+
+
+def apply_show_hidden_files(show: bool) -> tuple[bool, str]:
+    # Hidden: 1 = show, 2 = don't show
+    hkey = getattr(winreg, 'HKEY_CURRENT_USER', None)
+    if hkey is None:
+        return False, "Registry access not supported on this platform."
+    return r.set_reg_value(hkey,
+                           r"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+                           "Hidden", 1 if show else 2)
 
 
 def get_tweaks() -> List[Tweak]:
@@ -58,24 +97,23 @@ def get_tweaks() -> List[Tweak]:
             apply=lambda v: apply_color_mode(v)
         ),
         Tweak(
-            id="transparency",
+            id="transparency_effects",
             category="User Interface",
-            label="Transparency (app UI only)",
-            type="slider",
-            minimum=0, maximum=100, step=1,
-            default=20,
-            tooltip="Visual effect for this app; not a global OS setting.",
-            apply=lambda v: (True, f"ui transparency {v}%")
+            label="Transparency effects",
+            type="toggle",
+            default=True,
+            tooltip="Enable or disable system transparency effects.",
+            apply=lambda v: apply_transparency_effects(v)
         ),
         Tweak(
-            id="corner_radius",
+            id="taskbar_size",
             category="User Interface",
-            label="Corner radius (app UI only)",
-            type="number",
-            minimum=0, maximum=24, step=1,
-            default=12,
-            tooltip="Affects this app's surfaces only.",
-            apply=lambda v: (True, f"corner radius {v}px")
+            label="Taskbar size",
+            type="dropdown",
+            options=["Small", "Medium", "Large"],
+            default="Medium",
+            tooltip="Change Windows 11 taskbar size.",
+            apply=lambda v: apply_taskbar_size(v)
         ),
         Tweak(
             id="taskbar_align",
@@ -88,12 +126,31 @@ def get_tweaks() -> List[Tweak]:
             apply=lambda v: apply_taskbar_alignment(v)
         ),
         Tweak(
+            id="show_file_extensions",
+            category="User Interface",
+            label="Show file name extensions",
+            type="toggle",
+            default=True,
+            tooltip="Show known file type extensions in File Explorer.",
+            apply=lambda v: apply_show_file_extensions(v)
+        ),
+        Tweak(
+            id="show_hidden_files",
+            category="User Interface",
+            label="Show hidden files",
+            type="toggle",
+            default=False,
+            tooltip="Show hidden files and folders in File Explorer.",
+            apply=lambda v: apply_show_hidden_files(v)
+        ),
+        Tweak(
             id="start_recommendations",
             category="User Interface",
             label="Hide Start menu recommendations",
             type="toggle",
             default=True,
-            tooltip="Removes ‘Recommended’ items from Start (where supported).",
+            tooltip="Hide 'Recommended' items in Start (where supported).",
             apply=lambda v: apply_start_recommendations(v)
         ),
     ]
+

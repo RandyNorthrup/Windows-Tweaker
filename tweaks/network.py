@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import List
 from .base import Tweak
-from ..util.ps import ps
+from util.ps import ps
 
 # ---- Network implementations ----
 
@@ -50,7 +50,7 @@ def get_tweaks() -> List[Tweak]:
             type="dropdown",
             options=list(DNS_PRESETS.keys()),
             default="System default",
-            tooltip="Applies to Ethernet/Wi‑Fi adapters; advanced setups may need manual per‑adapter changes.",
+            tooltip="Applies to Ethernet/Wi-Fi adapters; advanced setups may need manual per-adapter changes.",
             apply=lambda v: apply_dns(v)
         ),
         Tweak(
@@ -60,7 +60,7 @@ def get_tweaks() -> List[Tweak]:
             type="toggle",
             default=False,
             tooltip="Enables DoH for known DNS endpoints (simplified).",
-            warning="Implementation is simplified; advanced users should configure per‑profile.",
+            warning="Implementation is simplified; advanced users should configure per-profile.",
             apply=lambda v: apply_doh(v)
         ),
         Tweak(

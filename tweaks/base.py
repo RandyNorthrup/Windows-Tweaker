@@ -41,7 +41,7 @@ class ActionPreview(QDialog):
         for a in actions:
             self.listw.addItem(QListWidgetItem(a))
         layout.addWidget(self.listw)
-        self.warn = QLabel("⚠️ Some actions require Administrator privileges.")
+        self.warn = QLabel("⚠ Some actions require Administrator privileges.")
         layout.addWidget(self.warn)
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(self.accept)
@@ -70,18 +70,30 @@ class TweakTab(QWidget):
             lbl.setToolTip(t.help or t.tooltip)
             form.addRow(lbl, ctrl)
             if t.warning:
-                w = QLabel(f"⚠️ {t.warning}")
+                w = QLabel(f"⚠ {t.warning}")
                 form.addRow("", w)
 
         self.main.addWidget(box)
 
+        # Subtle hint: some categories may require Explorer restart
+        if self.category.lower().startswith("user interface"):
+            hint = QLabel("Some UI changes may require restarting Windows Explorer to take effect.")
+            try:
+                hint.setProperty("class", "pill-hint")
+            except Exception:
+                pass
+            self.main.addWidget(hint)
+
         row = QHBoxLayout()
         row.addStretch()
         self.resetBtn = QPushButton("Reset")
+        self.revertBtn = QPushButton("Revert")
         self.applyBtn = QPushButton("Apply")
         self.applyBtn.clicked.connect(self.apply)
         self.resetBtn.clicked.connect(self.load_defaults)
+        self.revertBtn.clicked.connect(self.load_settings)
         row.addWidget(self.resetBtn)
+        row.addWidget(self.revertBtn)
         row.addWidget(self.applyBtn)
         self.main.addLayout(row)
 
@@ -210,6 +222,28 @@ class TweakTab(QWidget):
                 QMessageBox.critical(self, "Some actions failed", "\n".join(failures))
             else:
                 QMessageBox.information(self, "Success", f"{self.category}: all actions applied.")
+                # Offer Explorer restart for UI tab, with 'Don't ask again' preference
+                if self.category.lower().startswith("user interface"):
+                    ask = self.settings.value("General/AskRestartExplorer", True)
+                    if ask is True or str(ask).lower() == "true":
+                        box = QMessageBox(self)
+                        box.setIcon(QMessageBox.Icon.Question)
+                        box.setWindowTitle("Restart Explorer?")
+                        box.setText("Some UI changes may require restarting Windows Explorer.")
+                        box.setInformativeText("Restart Explorer now?")
+                        yes = box.addButton("Yes", QMessageBox.ButtonRole.YesRole)
+                        no = box.addButton("No", QMessageBox.ButtonRole.NoRole)
+                        from PySide6.QtWidgets import QCheckBox
+                        cb = QCheckBox("Don't ask again")
+                        box.setCheckBox(cb)
+                        box.exec()
+                        if box.clickedButton() == yes:
+                            from util.ps import restart_explorer  # local import to avoid cycles
+                            ok, out = restart_explorer()
+                            QMessageBox.information(self, "Restart Explorer", out if ok else f"Failed: {out}")
+                        if cb.isChecked():
+                            self.settings.setValue("General/AskRestartExplorer", False)
+                            self.settings.sync()
 
 
 def build_tab_widget(category: Category, tweaks: List[Tweak], settings: QSettings, parent=None) -> TweakTab:
